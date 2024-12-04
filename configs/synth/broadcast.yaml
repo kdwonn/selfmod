@@ -1,0 +1,8 @@
+# @package _global_
+models:
+  perceptual_grouping:
+    synthesizer:
+      _target_: ocl.synthesizer.BraodcastingSynthesizer
+      slot_dim: ${models.conditioning.object_dim}
+      feat_dim: ${..feature_dim}
+      feat_shape: ${..feat_num}

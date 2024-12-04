@@ -1,0 +1,188 @@
+# @package _global_
+defaults:
+  - /experiment/slot_pool/_base_vpt
+  - /dataset: coco
+  - /experiment/projects/bridging/dinosaur/_preprocessing_coco_dino_feature_recon_ccrop
+  - /experiment/slot_pool/_metrics_coco_vpt
+  - optional /vq_vpt: vq_base
+  - optional /callbacks: null
+  - _self_
+
+# The following parameters assume training on 8 GPUs, leading to an effective batch size of 64.
+logger:
+  _target_: pytorch_lightning.loggers.WandbLogger
+  notes: null
+  tags: null
+  offline: false
+  group: ${hydra:runtime.choices.dataset}
+  project: ocl-pool
+
+visualizations:
+  pool_indices:
+    _target_: routed.ocl.visualizations.IndexHistogram
+    pool_size: ${models.feedback_model.pool.codebook_size}
+    indices_path: feedback_model.pool_indices
+  pre_attn:
+    _target_: routed.ocl.visualizations.ResizedMask
+    target_size: 64
+    patch_mode: true
+    mask_path: feedback_model.perceptual_grouping.feature_attributions
+  attn:
+    _target_: routed.ocl.visualizations.ResizedMask
+    target_size: 64
+    patch_mode: true
+    mask_path: feedback_model.post_perceptual_grouping.feature_attributions
+  captioned_TD:
+    _target_: routed.ocl.visualizations.IndexCaptionedImage
+    image_vis:
+      _target_: ocl.visualizations.ResizedMask
+      target_size: 64
+      patch_mode: true
+    image_path: feedback_model.perceptual_grouping.feature_attributions
+    indices_path: feedback_model.pool_indices
+  code_to_feat_attn:
+    _target_: routed.ocl.visualizations.ResizedMask
+    target_size: 64
+    patch_mode: true
+    mask_path: feedback_model.code_to_feat_attn
+
+training_metrics:
+  perplexity:
+    _target_: routed.ocl.metrics.pool.Perplexity
+    pool_size: ${models.feedback_model.pool.codebook_size}
+    base: 2
+    indices_path: feedback_model.pool_indices
+  unique_ratio:
+    _target_: routed.ocl.metrics.UniqueRatio
+    slot_num: ${models.feedback_model.conditioning.n_slots}
+    indices_path: feedback_model.pool_indices
+  pool_usage:
+    _target_: routed.ocl.metrics.CodebookUsage
+    pool_size: ${models.feedback_model.pool.codebook_size}
+    indices_path: feedback_model.pool_indices
+  feedback_prob:
+    _target_: routed.ocl.metrics.pool.Scalar
+    value_path: feedback_model.feedback_prob
+  norm_feat:
+    _target_: routed.ocl.metrics.TensorNormStatistic
+    dim: -1
+    tensor_path: feedback_model.feature_extractor.features
+  norm_post_feat:
+    _target_: routed.ocl.metrics.TensorNormStatistic
+    dim: -1
+    tensor_path: feedback_model.post_feature_extractor.features
+  l2_dist_pre_post_slots:
+    _target_: routed.ocl.metrics.TensorDistStatistic
+    dist: l2
+    tensor1_path: feedback_model.perceptual_grouping.objects
+    tensor2_path: feedback_model.post_perceptual_grouping.objects
+  cos_dist_pre_post_slots:
+    _target_: routed.ocl.metrics.TensorDistStatistic
+    dist: cos
+    tensor1_path: feedback_model.perceptual_grouping.objects
+    tensor2_path: feedback_model.post_perceptual_grouping.objects
+
+evaluation_metrics:
+  perplexity:
+    _target_: routed.ocl.metrics.pool.Perplexity
+    pool_size: ${models.feedback_model.pool.codebook_size}
+    base: 2
+    indices_path: feedback_model.pool_indices
+  pool_usage:
+    _target_: routed.ocl.metrics.CodebookUsage
+    pool_size: ${models.feedback_model.pool.codebook_size}
+    indices_path: feedback_model.pool_indices
+  norm_feat:
+    _target_: routed.ocl.metrics.TensorNormStatistic
+    dim: -1
+    tensor_path: feedback_model.feature_extractor.features
+  norm_post_feat:
+    _target_: routed.ocl.metrics.TensorNormStatistic
+    dim: -1
+    tensor_path: feedback_model.post_feature_extractor.features
+
+training_vis_frequency: 10000
+
+trainer:
+  devices: 1
+  max_steps: 500000
+  max_epochs:
+  check_val_every_n_epoch: null
+  val_check_interval: 5000
+
+dataset:
+  num_workers: 4
+  batch_size: 64
+
+experiment:
+  input_feature_dim: 768
+
+
+models:
+  feedback_model:
+    _target_: routed.ocl.feedback_model.FeedbackCodeVPT
+    feedback_prob: 0.5
+    use_initial_code: true
+    pre_masking_prob: 0.0
+    use_masking_token: false
+
+    conditioning:
+      _target_: ocl.conditioning.RandomConditioning
+      n_slots: 7
+      object_dim: 256
+
+    feature_extractor:
+      model_name: vit_base_patch16_224_dino
+      pretrained: ${when_testing:false,true}
+      freeze: true
+      use_deep: true 
+      use_inter_share: true
+      num_per_slot: 3
+      use_code: true
+      use_mlp: true
+      use_ln: true
+      use_sa: false
+      use_running_prompt: false
+      num_slot: ${models.feedback_model.conditioning.n_slots}
+      code_dim: ${experiment.input_feature_dim}
+      # prompt_layers: 9-11
+
+    perceptual_grouping: {}
+
+    td_synth:
+      _target_: ocl.synthesizer.MaskedFeatSumSynthesizer
+      detach_mask: true
+
+    code_to_feat_attn:
+      _target_: ocl.synthesizer.CodeToFeatAttn
+      dim: 1
+
+    pool:
+      dim: ${experiment.input_feature_dim}
+      codebook_dim: ${experiment.input_feature_dim}
+
+    object_decoder:
+      _target_: ocl.decoding.AutoregressivePatchDecoder
+      decoder_cond_dim: ${.output_dim}
+      use_input_transform: true
+      use_decoder_masks: true
+      decoder:
+        _target_: ocl.neural_networks.build_transformer_decoder
+        _partial_: true
+        n_layers: 4
+        n_heads: 8
+        return_attention_weights: true
+  
+losses:
+  commit:
+    _target_: routed.ocl.losses.ScalarWrapperLoss
+    weight: 0
+    loss_path: feedback_model.commit_loss
+
+optimizers:
+  opt0:
+    parameter_groups:
+      - params: models.feedback_model.feature_extractor.model.prompt_pool
+        lr: 0.0004
+      - params: [models.feedback_model.conditioning, models.feedback_model.perceptual_grouping, models.feedback_model.object_decoder, models.feedback_model.pool, models.feedback_model.td_synth]
+        lr: 0.0004

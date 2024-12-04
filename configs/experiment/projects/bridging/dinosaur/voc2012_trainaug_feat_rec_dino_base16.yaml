@@ -1,0 +1,55 @@
+# @package _global_
+defaults:
+  - /experiment/projects/bridging/dinosaur/_base_feature_recon
+  - /dataset: voc2012_trainaug
+  - /experiment/projects/bridging/dinosaur/_preprocessing_voc2012_segm_dino_feature_recon
+  - /experiment/projects/bridging/dinosaur/_metrics_coco
+  - _self_
+
+logger:
+  _target_: pytorch_lightning.loggers.WandbLogger
+  notes: null
+  tags: null
+  offline: false
+  group: ${hydra:runtime.choices.dataset}
+  project: ocl-pool
+
+training_vis_frequency: 10000
+
+
+# The following parameters assume training on 8 GPUs, leading to an effective batch size of 64.
+trainer:
+  devices: 1
+  max_steps: 250000
+  max_epochs:
+  check_val_every_n_epoch: null
+  val_check_interval: 1000
+  gradient_clip_val: 1.0
+
+dataset:
+  num_workers: 4
+  batch_size: 64
+
+models:
+  conditioning:
+    _target_: routed.ocl.conditioning.RandomConditioning
+    n_slots: 6
+    object_dim: 256
+
+    batch_size_path: input.batch_size
+  feature_extractor:
+    model_name: vit_base_patch16_224_dino
+    pretrained: ${when_testing:false,true}
+    freeze: true
+
+  perceptual_grouping: {}
+  object_decoder:
+    _target_: routed.ocl.decoding.PatchDecoder
+    decoder:
+      _target_: ocl.neural_networks.build_mlp
+      _partial_: true
+      features: [2048, 2048, 2048]
+    object_features_path: perceptual_grouping.objects
+experiment:
+  input_feature_dim: 768
+

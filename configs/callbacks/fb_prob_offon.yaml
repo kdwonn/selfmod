@@ -1,0 +1,5 @@
+# @package _global_
+trainer:
+  callbacks:
+    - _target_: routed.ocl.callbacks.FeedbackProbOffOn
+      starting_iter: 50000

@@ -1,0 +1,8 @@
+# @package _global_
+models:
+  perceptual_grouping:
+    pool:
+      _target_: ocl.slot_dict.MemDPC
+      in_dim: ${models.conditioning.object_dim}
+      code_dim: 10
+      codebook_size: 1024

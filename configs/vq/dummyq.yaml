@@ -1,0 +1,18 @@
+# @package _global_
+models:
+  perceptual_grouping:
+    pool:
+      _target_: ocl.slot_dict.DummyQ
+      dim: ${models.conditioning.object_dim}
+      codebook_size: 128
+      decay: 0.9
+      heads: 2
+      separate_codebook_per_head: false
+      kmeans_init: false
+      commitment_weight: 0.1
+      affine_param: false
+      straight_through: false
+      stochastic_sample_codes: false
+      codebook_dim: 8
+      threshold_ema_dead_code: 2
+      use_cosine_sim: true

@@ -1,0 +1,19 @@
+# @package _global_
+models:
+  perceptual_grouping:
+    pool:
+      _target_: ocl.slot_dict.BlockVectorQuantize
+      num_blocks: ${models.perceptual_grouping.num_blocks}
+      codebook_size: 256
+      decay: 0.99
+      heads: 1
+      separate_codebook_per_head: false
+      kmeans_init: true
+      commitment_weight: 0.1
+      affine_param: false
+      straight_through: false
+      stochastic_sample_codes: false
+      dim: "${eval_lambda:'lambda d, blk: d // blk', ${models.conditioning.object_dim}, ${models.perceptual_grouping.pool.num_blocks}}"
+      codebook_dim: "${eval_lambda:'lambda d, blk: d // blk', ${models.conditioning.object_dim}, ${models.perceptual_grouping.pool.num_blocks}}"
+      threshold_ema_dead_code: 0.8
+      use_cosine_sim: false

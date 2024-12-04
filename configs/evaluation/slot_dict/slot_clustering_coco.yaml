@@ -1,0 +1,92 @@
+# @package _global_
+defaults:
+  - /evaluation_clustering_config
+  - /evaluation/projects/bridging/_base_clustering
+  - /evaluation/projects/bridging/_preprocessing_coco
+  - /dataset: coco
+  - _self_
+
+batch_size: 128
+
+modules:
+  masks_resized:
+    _target_: routed.ocl.utils.resizing.Resize
+    input_path: object_decoder.masks
+    size_tensor_path: input.segmentation_mask
+    patch_mode: true
+    channels_last: false
+  feature_masked_sum:
+    _target_: routed.ocl.utils.misc.MaskedSum
+    x_path: feature_extractor.features
+    mask_path: perceptual_grouping.feature_attributions
+
+clusterings:
+  kmeans256_l2:
+    _target_: ocl.metrics.SklearnClustering
+    n_clusters: 256
+    method: kmeans
+    use_l2_normalization: true
+    clustering_kwargs:
+      n_init: 10
+  kmeans256:
+    _target_: ocl.metrics.SklearnClustering
+    n_clusters: 256
+    method: kmeans
+    use_l2_normalization: false
+    clustering_kwargs:
+      n_init: 10
+  kmeans64_l2:
+    _target_: ocl.metrics.SklearnClustering
+    n_clusters: 64
+    method: kmeans
+    use_l2_normalization: true
+    clustering_kwargs:
+      n_init: 10
+  kmeans64:
+    _target_: ocl.metrics.SklearnClustering
+    n_clusters: 64
+    method: kmeans
+    use_l2_normalization: false
+    clustering_kwargs:
+      n_init: 10
+  kmeans32:
+    _target_: ocl.metrics.SklearnClustering
+    n_clusters: 32
+    method: kmeans
+    use_l2_normalization: false
+    clustering_kwargs:
+      n_init: 10
+  kmeans16:
+    _target_: ocl.metrics.SklearnClustering
+    n_clusters: 16
+    method: kmeans
+    use_l2_normalization: false
+    clustering_kwargs:
+      n_init: 10
+  # kmeans512_l2:
+  #   _target_: ocl.metrics.SklearnClustering
+  #   n_clusters: 512
+  #   method: kmeans
+  #   use_l2_normalization: true
+  #   clustering_kwargs:
+  #     n_init: 10
+  # kmeans512:
+  #   _target_: ocl.metrics.SklearnClustering
+  #   n_clusters: 512
+  #   method: kmeans
+  #   use_l2_normalization: false
+  #   clustering_kwargs:
+  #     n_init: 10
+
+denormalization:
+  _target_: ocl.preprocessing.Denormalize
+  mean:
+  - 0.485
+  - 0.456
+  - 0.406
+  std:
+  - 0.229
+  - 0.224
+  - 0.225
+image_path: input.image
+masks_path: object_decoder.masks_as_image

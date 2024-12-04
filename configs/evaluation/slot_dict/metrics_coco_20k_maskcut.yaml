@@ -1,0 +1,54 @@
+# @package _global_
+# Evaluate center crop masks on COCO.
+
+defaults:
+  - /evaluation_config
+  - /evaluation/projects/bridging/_base_metrics
+  - /evaluation/projects/bridging/_preprocessing_coco
+  - /evaluation/projects/bridging/_metrics_discovery_masks
+  - /evaluation/projects/bridging/_metrics_segmentation
+  - /dataset: coco2014_20k
+  - _self_
+
+eval_batch_size: 16
+
+dataset:
+  train_shards:
+  test_shards:
+
+modules:
+  maskcut:
+    _target_: routed.ocl.maskcut.MaskCut
+    feature_path: feature_extractor.features
+
+train_config_overrides:
+  - models.feature_extractor.feature_level=key12
+
+load_checkpoint: False
+
+# save_outputs: true
+# skip_metrics: true
+# n_samples_to_store: 30
+# outputs_to_store:
+#   - input.orig_image
+#   - input.instance_mask
+#   - maskcut.masks
+
+
+evaluation_metrics:
+  instance_mask_ari:
+    prediction_path: maskcut.masks
+  instance_mask_unsup_iou:
+    prediction_path: maskcut.masks
+  instance_mask_abo:
+    prediction_path: maskcut.masks
+  instance_mask_corloc:
+    prediction_path: maskcut.masks
+  instance_mask_recall:
+    prediction_path: maskcut.masks
+  segmentation_mask_ari:
+    prediction_path: maskcut.masks
+  segmentation_mask_unsup_iou:
+    prediction_path: maskcut.masks
+  segmentation_mask_abo:
+    prediction_path: maskcut.masks

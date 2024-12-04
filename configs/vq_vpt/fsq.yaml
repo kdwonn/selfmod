@@ -1,0 +1,8 @@
+# @package _global_
+
+models:
+  feedback_model:
+    pool:
+      _target_: ocl.slot_dict.FSQ
+      dim: ${..conditioning.object_dim}
+      levels: [6, 6, 5] 

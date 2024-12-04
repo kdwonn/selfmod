@@ -1,0 +1,23 @@
+# @package _global_
+# Metrics for abs stats.
+evaluation_metrics:
+  norm_feat:
+    _target_: routed.ocl.metrics.TensorNormStatistic
+    dim: -1
+    tensor_path: perceptual_grouping.pos_feat
+  norm_enc_feat:
+    _target_: routed.ocl.metrics.TensorNormStatistic
+    dim: -1
+    tensor_path: perceptual_grouping.object_decoder.target
+  norm_k_inputs:
+    _target_: routed.ocl.metrics.TensorNormStatistic
+    dim: -1
+    tensor_path: perceptual_grouping.k_inputs
+  norm_feedback:
+    _target_: routed.ocl.metrics.TensorNormStatistic
+    dim: -1
+    tensor_path: perceptual_grouping.feedback
+  norm_pos_feedback:
+    _target_: routed.ocl.metrics.TensorNormStatistic
+    dim: -1
+    tensor_path: perceptual_grouping.pos_feedback

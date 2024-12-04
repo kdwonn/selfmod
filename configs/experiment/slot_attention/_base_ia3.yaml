@@ -1,0 +1,114 @@
+# @package _global_
+# Default parameters for slot attention.
+
+defaults:
+  - /experiment/_output_path
+  - /training_config
+  - _self_
+
+logger:
+  _target_: pytorch_lightning.loggers.WandbLogger
+  notes: null
+  tags: null
+  offline: false
+  group: ${hydra:runtime.choices.dataset}
+  project: ocl-pool
+
+
+models:
+  feedback_model:
+    _target_: routed.ocl.feedback_model.FeedbackCodeIA3PatchDec
+    feedback_prob: 1
+
+    conditioning:
+      _target_: ocl.conditioning.RandomConditioning
+      n_slots: 7
+      object_dim: 64
+
+    feature_extractor:
+      _target_: ocl.feature_extractors.SlotAttentionFeatureExtractor
+      # video_path: input.image
+
+    perceptual_grouping:
+      _target_: ocl.perceptual_grouping_modular.SlotAttentionGroupingIA3
+      ia3_normalizer: none
+      ia3_use_mlp: false
+      object_dim: 64
+      feature_dim: 64
+      kvq_dim: 128
+      positional_embedding:
+        _target_: ocl.neural_networks.wrappers.Sequential
+        _args_:
+          - _target_: ocl.neural_networks.positional_embedding.SoftPositionEmbed
+            n_spatial_dims: 2
+            feature_dim: 64
+          - _target_: ocl.neural_networks.build_two_layer_mlp
+            input_dim: 64
+            output_dim: 64
+            hidden_dim: 128
+            initial_layer_norm: true
+            residual: false
+      ff_mlp:
+        _target_: ocl.neural_networks.build_two_layer_mlp
+        input_dim: 64
+        output_dim: 64
+        hidden_dim: 128
+        initial_layer_norm: false
+        residual: false
+
+    pool: {}
+
+    object_decoder:
+      _target_: ocl.decoding.SlotAttentionDecoder
+      # object_features_path: perceptual_grouping.objects
+      decoder:
+        _target_: ocl.decoding.get_slotattention_decoder_backbone
+        object_dim: 64
+      positional_embedding:
+        _target_: ocl.neural_networks.positional_embedding.SoftPositionEmbed
+        n_spatial_dims: 2
+        feature_dim: 64
+        cnn_channel_order: true
+
+    image_path: input.image
+    batch_size_path: input.batch_size
+
+losses:
+  mse:
+    _target_: routed.ocl.losses.ReconstructionLoss
+    loss_type: mse_sum
+    input_path: feedback_model.object_decoder.reconstruction
+    target_path: input.image
+
+visualizations:
+  input:
+    _target_: routed.ocl.visualizations.Image
+    denormalization: "${lambda_fn:'lambda t: t * 0.5 + 0.5'}"
+    image_path: input.image
+  reconstruction:
+    _target_: routed.ocl.visualizations.Image
+    denormalization: ${..input.denormalization}
+    image_path: feedback_model.object_decoder.reconstruction
+  objects:
+    _target_: routed.ocl.visualizations.VisualObject
+    denormalization: ${..input.denormalization}
+    object_path: feedback_model.object_decoder.object_reconstructions
+    mask_path: feedback_model.object_decoder.masks
+  pred_segmentation:
+    _target_: routed.ocl.visualizations.Segmentation
+    denormalization: ${..input.denormalization}
+    image_path: input.image
+    mask_path: feedback_model.object_decoder.masks
+optimizers:
+  opt0:
+    _target_: ocl.optimization.OptimizationWrapper
+    optimizer:
+      _target_: torch.optim.Adam
+      _partial_: true
+      lr: 0.0004
+    lr_scheduler:
+      _target_: ocl.scheduling.exponential_decay_after_optional_warmup
+      _partial_: true
+      decay_rate: 0.5
+      decay_steps: 100000
+      warmup_steps: 10000

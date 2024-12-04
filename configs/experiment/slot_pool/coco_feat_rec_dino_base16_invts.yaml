@@ -1,0 +1,79 @@
+# @package _global_
+defaults:
+  - /experiment/projects/bridging/dinosaur/_base_feature_recon
+  - /dataset: coco
+  - /experiment/projects/bridging/dinosaur/_preprocessing_coco_dino_feature_recon_ccrop
+  - /experiment/projects/bridging/dinosaur/_metrics_coco
+  - _self_
+
+# The following parameters assume training on 8 GPUs, leading to an effective batch size of 64.
+logger:
+  _target_: pytorch_lightning.loggers.WandbLogger
+  notes: null
+  tags: null
+  offline: false
+  group: ${hydra:runtime.choices.dataset}
+  project: ocl-pool
+
+visualizations:
+  rel_grid:
+    _target_: routed.ocl.visualizations.ResizedMask
+    target_size: 64
+    patch_mode: true
+    mask_path: perceptual_grouping.rel_pos_grid
+  attn:
+    _target_: routed.ocl.visualizations.ResizedMask
+    target_size: 64
+    patch_mode: true
+    mask_path: perceptual_grouping.feature_attributions
+
+training_metrics:
+
+training_vis_frequency: 10000
+
+trainer:
+  devices: 1
+  max_steps: 500000
+  max_epochs:
+  check_val_every_n_epoch: null
+  val_check_interval: 5000
+
+dataset:
+  num_workers: 4
+  batch_size: 64
+
+experiment:
+  input_feature_dim: 768
+
+
+models:
+  conditioning:
+    _target_: routed.ocl.conditioning.RandomConditioningTransScale
+    n_slots: 7
+    object_dim: ${models.perceptual_grouping.object_dim}
+
+    batch_size_path: input.batch_size
+  feature_extractor:
+    model_name: vit_base_patch16_224_dino
+    pretrained: ${when_testing:false,true}
+    freeze: true
+  perceptual_grouping:
+    _target_: routed.ocl.perceptual_grouping_disent.SlotAttentionGroupingInvTransScale
+    object_dim: 256
+    ff_mlp:
+      _target_: ocl.neural_networks.build_two_layer_mlp
+      input_dim: ${models.conditioning.object_dim}
+      output_dim: ${models.conditioning.object_dim}
+      hidden_dim: "${eval_lambda:'lambda dim: 4 * dim', ${models.conditioning.object_dim}}"
+      initial_layer_norm: true
+      residual: true
+    scale_factor: 5
+  object_decoder:
+    _target_: routed.ocl.decoding.InvTransScalePatchDecoder
+    decoder:
+      _target_: ocl.neural_networks.build_mlp
+      _partial_: true
+      features: [2048, 2048, 2048]
+    object_features_path: perceptual_grouping.objects
+    position_features_path: perceptual_grouping.positions
+    scale_factor: 5

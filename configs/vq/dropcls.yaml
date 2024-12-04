@@ -1,0 +1,7 @@
+# @package _global_
+models:
+  perceptual_grouping:
+    pool:
+      _target_: ocl.slot_dict.DropClassifier
+      in_dim: ${models.conditioning.object_dim}
+      codebook_size: 256

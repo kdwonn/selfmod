@@ -1,0 +1,54 @@
+# @package _global_
+# Configuration to exactly reproduce unsupervised object recognition of the original slot attention
+# paper.
+defaults:
+  - /experiment/slot_attention/_base_ia3
+  - /dataset: clevr6
+  - /experiment/slot_attention/_preprocessing_clevr
+  - /experiment/slot_attention/_metrics_clevr_ia3
+  - /vq_vpt/vq_base
+  - _self_
+
+# The following parameters assume training on 8 GPUs, leading to an effective batch size of 64.
+trainer:
+  devices: 1
+  max_steps: 500000
+  max_epochs:
+  check_val_every_n_epoch: null
+  val_check_interval: 5000
+
+training_vis_frequency: 5000
+
+dataset:
+  num_workers: 4
+  batch_size: 64
+
+models:
+  feedback_model:
+    conditioning:
+      n_slots: 7
+
+training_metrics:
+  perplexity:
+    _target_: routed.ocl.metrics.pool.Perplexity
+    pool_size: ${models.feedback_model.pool.codebook_size}
+    base: 2
+    indices_path: feedback_model.pool_indices
+  unique_ratio:
+    _target_: routed.ocl.metrics.UniqueRatio
+    slot_num: ${models.feedback_model.conditioning.n_slots}
+    indices_path: feedback_model.pool_indices
+  pool_usage:
+    _target_: routed.ocl.metrics.CodebookUsage
+    pool_size: ${models.feedback_model.pool.codebook_size}
+    indices_path: feedback_model.pool_indices
+  l2_dist_pre_post_slots:
+    _target_: routed.ocl.metrics.TensorDistStatistic
+    dist: l2
+    tensor1_path: feedback_model.perceptual_grouping.objects
+    tensor2_path: feedback_model.post_perceptual_grouping.objects
+  cos_dist_pre_post_slots:
+    _target_: routed.ocl.metrics.TensorDistStatistic
+    dist: cos
+    tensor1_path: feedback_model.perceptual_grouping.objects
+    tensor2_path: feedback_model.post_perceptual_grouping.objects

@@ -1,0 +1,38 @@
+# @package _global_
+defaults:
+  - /evaluation_clustering_config
+  - /evaluation/projects/bridging/_base_clustering
+  - /evaluation/projects/bridging/_preprocessing_coco
+  - /dataset: coco
+  - _self_
+
+batch_size: 128
+
+modules:
+  masks_resized:
+    _target_: routed.ocl.utils.resizing.Resize
+    input_path: feedback_model.perceptual_grouping.alpha_weights
+    size_tensor_path: input.image
+    patch_mode: true
+    channels_last: false
+  # feature_masked_sum:
+  #   _target_: routed.ocl.utils.misc.MaskedSum
+  #   x_path: feature_extractor.features
+  #   mask_path: perceptual_grouping.feature_attributions
+
+masks_path: masks_resized
+
+slots_path: feedback_model.perceptual_grouping.objects
+masks_flat_path: feedback_model.object_decoder.masks
+code_indices_path: feedback_model.pool_indices
+
+denormalization:
+  _target_: ocl.preprocessing.Denormalize
+  mean:
+  - 0.485
+  - 0.456
+  - 0.406
+  std:
+  - 0.229
+  - 0.224
+  - 0.225

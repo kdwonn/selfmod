@@ -1,0 +1,17 @@
+# @package _global_
+
+models:
+  perceptual_grouping:
+    pool:
+      _target_: ocl.slot_dict.ResidualVQ
+      dim: ${models.conditioning.object_dim}
+      num_quantizers: 4
+      codebook_size: 1024
+      decay: 0.99
+      heads: 1
+      commitment_weight: 0.1
+      stochastic_sample_codes: false
+      codebook_dim: 8
+      threshold_ema_dead_code: 0
+      use_cosine_sim: false
+      shared_codebook: true  

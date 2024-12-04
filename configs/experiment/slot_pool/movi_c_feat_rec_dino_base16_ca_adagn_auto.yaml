@@ -1,0 +1,123 @@
+# @package _global_
+defaults:
+  - /experiment/projects/bridging/dinosaur/_base_feature_recon
+  - /dataset: movi_c_image
+  - /experiment/projects/bridging/dinosaur/_preprocessing_movi_dino_feature_recon
+  - /experiment/slot_pool/_metrics_clevr_patch
+  - optional /vq: vq
+  - _self_
+
+# The following parameters assume training on 8 GPUs, leading to an effective batch size of 64.
+logger:
+  _target_: pytorch_lightning.loggers.WandbLogger
+  notes: null
+  tags: null
+  offline: false
+  group: ${hydra:runtime.choices.dataset}
+  project: ocl-pool
+
+visualizations:
+  pool_indices:
+    _target_: routed.ocl.visualizations.IndexHistogram
+    pool_size: ${models.perceptual_grouping.pool.codebook_size}
+    indices_path: perceptual_grouping.pool_indices
+  captioned_TD:
+    _target_: routed.ocl.visualizations.IndexCaptionedImage
+    image_vis:
+      _target_: ocl.visualizations.ResizedMask
+      target_size: 92
+      patch_mode: true
+    image_path: perceptual_grouping.alpha_weights
+    indices_path: perceptual_grouping.pool_indices
+  attn:
+    _target_: routed.ocl.visualizations.ResizedMask
+    target_size: 64
+    patch_mode: true
+    mask_path: perceptual_grouping.feature_attributions
+
+training_metrics:
+  perplexity:
+    _target_: routed.ocl.metrics.pool.Perplexity
+    pool_size: ${models.perceptual_grouping.pool.codebook_size}
+    base: 2
+    indices_path: perceptual_grouping.pool_indices
+  unique_ratio:
+    _target_: routed.ocl.metrics.UniqueRatio
+    slot_num: ${models.conditioning.n_slots}
+    indices_path: perceptual_grouping.pool_indices
+  pool_usage:
+    _target_: routed.ocl.metrics.CodebookUsage
+    pool_size: ${models.perceptual_grouping.pool.codebook_size}
+    indices_path: perceptual_grouping.pool_indices
+
+evaluation_metrics:
+  perplexity:
+    _target_: routed.ocl.metrics.pool.Perplexity
+    pool_size: ${models.perceptual_grouping.pool.codebook_size}
+    base: 2
+    indices_path: perceptual_grouping.pool_indices
+  pool_usage:
+    _target_: routed.ocl.metrics.CodebookUsage
+    pool_size: ${models.perceptual_grouping.pool.codebook_size}
+    indices_path: perceptual_grouping.pool_indices
+
+training_vis_frequency: 10000
+
+trainer:
+  devices: 1
+  max_steps: 500000
+  max_epochs:
+  check_val_every_n_epoch: null
+  val_check_interval: 5000
+
+dataset:
+  num_workers: 4
+  batch_size: 64
+
+experiment:
+  input_feature_dim: 768
+
+
+models:
+  conditioning:
+    _target_: routed.ocl.conditioning.RandomConditioning
+    n_slots: 11
+    object_dim: 128
+    batch_size_path: input.batch_size
+  feature_extractor:
+    model_name: vit_base_patch16_224_dino
+    pretrained: ${when_testing:false,true}
+    freeze: true
+  perceptual_grouping:
+    _target_: routed.ocl.perceptual_grouping_ca.SlotAttentionGroupingIterCA
+    ca:
+      _target_: ocl.slot_dict.feat_conditioning.MaskedAdaGN
+      in_dim: ${..object_dim}
+      out_dim: ${experiment.input_feature_dim}
+      pre_ln: true
+    ca_takes_attn: true
+    input_feature_dim: ${experiment.input_feature_dim}
+    scale_sum_to_one: true
+    feedback_scale: 0.1
+  object_decoder:
+    _target_: routed.ocl.decoding.AutoregressivePatchDecoder
+    decoder_cond_dim: ${.output_dim}
+    use_input_transform: true
+    use_decoder_masks: true
+    decoder:
+      _target_: ocl.neural_networks.build_transformer_decoder
+      _partial_: true
+      n_layers: 4
+      n_heads: 4
+      return_attention_weights: true
+  masks_as_image:
+    _target_: routed.ocl.utils.resizing.Resize
+    input_path: object_decoder.masks
+    size: 128
+    resize_mode: bilinear
+    patch_mode: true
+losses:
+  commit:
+    _target_: routed.ocl.losses.ScalarWrapperLoss
+    weight: 0.01
+    loss_path: perceptual_grouping.commit_loss
